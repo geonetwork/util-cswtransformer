@@ -1,0 +1,279 @@
+// Copyright (c) 2009 GeoCat, published under the MIT license. 
+<html>
+<head>
+<title>de CSW-API voor het Nationaal GeoRegister</title>
+<link href="http://geonetwork.tv/favicon.ico" rel="shortcut icon" type="image/x-icon" />
+
+<script type="text/javascript" src="./ngr.js"></script>
+<script type="text/javascript" src="./json.js"></script>
+
+<script>
+// dit is het applicatie script waarin:
+// - het zoekformulier wordt afgehandeld
+// - de NGR server wordt bevraagd via een XMLHTTPRequest
+// - de NGR resultaten in een javascript alert worden weergegeven
+
+// showResponse toont de resultaten uit de NGR JSON in een javascript alert
+
+function showResponse(jsonObj, resultidx) {
+
+    var GetRecordsResponse = jsonObj.GetRecordsResponse;
+	
+	if(resultidx > parseInt(GetRecordsResponse.SearchResults.numberOfRecordsReturned)) {
+		return;
+	}
+	document.getElementById('currentresult').innerHTML = resultidx;
+
+	document.getElementById('demo' + this.demoIdx+'result').style.display = 'block';
+	document.getElementById('json' + demoIdx + 'result').innerHTML = JSON.stringify(jsonObj);	
+	document.getElementById('json' + this.demoIdx).style.display = 'block';
+	document.getElementById('totalresults' + this.demoIdx).innerHTML = GetRecordsResponse.SearchResults.numberOfRecordsMatched;
+	document.getElementById('resultsReturned' + this.demoIdx).innerHTML = GetRecordsResponse.SearchResults.numberOfRecordsReturned;
+	if(this.maxrecords > 1) {
+		document.getElementById('fileIdentifierValue' + this.demoIdx).innerHTML = GetRecordsResponse.SearchResults.MD_Metadata[resultidx].fileIdentifier.CharacterString;
+		document.getElementById('titleValue' + this.demoIdx).innerHTML = GetRecordsResponse.SearchResults.MD_Metadata[resultidx].identificationInfo.MD_DataIdentification.citation.CI_Citation.title.CharacterString;
+	}
+	else {
+		document.getElementById('fileIdentifierValue' + this.demoIdx).innerHTML = GetRecordsResponse.SearchResults.MD_Metadata.fileIdentifier.CharacterString;
+		document.getElementById('titleValue' + this.demoIdx).innerHTML = GetRecordsResponse.SearchResults.MD_Metadata.identificationInfo.MD_DataIdentification.citation.CI_Citation.title.CharacterString;	
+	}
+	if(elementset == 'summary' || elementset == 'full') {
+
+		document.getElementById('abstractValue' + this.demoIdx).innerHTML = GetRecordsResponse.SearchResults.MD_Metadata.identificationInfo.MD_DataIdentification.abstract.CharacterString;
+		document.getElementById('pointofcontactindividualnameValue' + this.demoIdx).innerHTML = GetRecordsResponse.SearchResults.MD_Metadata.identificationInfo.MD_DataIdentification.pointOfContact.CI_ResponsibleParty.individualName.CharacterString;
+		document.getElementById('pointofcontactorganisationnameValue' + this.demoIdx).innerHTML = GetRecordsResponse.SearchResults.MD_Metadata.identificationInfo.MD_DataIdentification.pointOfContact.CI_ResponsibleParty.organisationName.CharacterString;
+		document.getElementById('pointofcontactpositionnameValue' + this.demoIdx).innerHTML = GetRecordsResponse.SearchResults.MD_Metadata.identificationInfo.MD_DataIdentification.pointOfContact.CI_ResponsibleParty.positionName.CharacterString;
+	}
+
+	
+}
+
+var demoIdx;
+var elementset;
+var maxrecords;
+var currentresult;
+
+function demoResultIndex(demoIdx, elementset, maxrecords, currentresult) {
+	freetext(demoIdx, elementset, maxrecords, currentresult, null, null);
+}
+
+function freetext(demoIdx, elementset, maxrecords, currentresult, field, value) {
+	this.elementset = elementset;
+	this.demoIdx = demoIdx;
+	this.maxrecords = maxrecords;
+	this.currentresult = currentresult;
+	getNGRRecords(field, value, null, null, null, elementset, maxrecords, currentresult);	
+}
+
+function demo(demoIdx, elementset, maxrecords) {
+	demoResultIndex(demoIdx, elementset, maxrecords, 1);
+}
+function json() {
+	document.getElementById('json' + this.demoIdx + 'result').style.display = 'block';
+
+}
+
+</script>
+</head>
+<body style="font-family:Lucida, sans-serif;padding:50px;">
+
+<h1>Welkom bij de NGR CSW-API documentatie en demo pagina</h1>
+
+
+<h2>introductie</h2>
+<div  style="margin:10px;">
+De NGR CSW-API is een web applicatie die fungeert als een proxy voor de GeoNetwork CSW server die onderdeel is van NGR. Cliënts kunnen web sites of web applicaties maken die 
+via een eenvoudige Javascript interface de NGR CSW server kunnen bevragen. Deze pagina beschrijft hoe deze interface eruit ziet, en fungeert zelf meteen als demo pagina - hieronder 
+worden verschllende opties live getoond.
+</div>
+
+<div style="margin:10px;">
+De CSW-API is oorspronkelijk ontwikkeld door GeoDan. Deze implementatie gaf slechts toegang tot enkele van de vele elementen van metadata. Daarnaast raakte de implementatie onbruikbaar
+doordat GeoNetwork een betere ondersteuning voor CSW 2.0.2 doorvoerde (en NGR daarmee ook) terwijl de CSW-API niet helemaal correcte CSW requests opstelde. Daarom is mij gevraagd e.e.a.
+aan te passen zodat:
+	<ul>
+		<li>de CSW requests het wel doen</li>
+		<li>de clients van de CSW-API de beschikking krijgen over minimaal alle elementen die in het Nederlands Profiel staan</li>
+		<li>de clients zelf custom filters kunnen hanteren in hun CSW requests</li>
+	</ul>
+</div>
+
+<h2>interface - request</h2>
+<div  style="margin:10px;">
+De NGR CSW-API is een web (servlet) applicatie die in principe overal zou kunnen draaien, maar die in de praktijk voor het NGR in dezelfde servlet container draait als het NGR zelf.
+De requests kunnen de volgende parameters gebruiken:
+
+	<ul>
+	<li style="margin:5px;">url - dit is de url naar de gewenste CSW server. Voor NGR, gebruik de waarde http://nationaalgeoregister.nl/geonetwork/srv/en/csw.</li>
+	<li style="margin:5px;">ElementSetName - dit geeft de keus uit de 3 standaard CSW resultset, "full", "summary", of "brief". De default waarde is "full". Met de waarde "minimal" wordt de oude Geodan code aangeroepen, maar dat werkt verder niet.</li>
+	<li style="margin:5px;">startPosition - as in OGC 07-006 CSW 2.0.2. Default value is 1</li>
+	<li style="margin:5px;">maxRecords - as in OGC 07-006 CSW 2.0.2. Default value is 10 </li>
+	<li style="margin:5px;">searchterms-1 .. searchterms-X - space-separated list(s) of terms to search. If none are present, no filter is created ; the index number suffix relates the searchterms to a specific field </li>
+	<li style="margin:5px;">field-1 .. field-X - the field(s) to search in ; the index number suffix relates the field to specific searchterms ; if there are searchterms and/or fields without matching field and/or searchterm, they are ignored. The fieldnames you can use are listed in NGR's <a href="http://nationaalgeoregister.nl/geonetwork/srv/en/csw?service=CSW&version=2.0.2&request=GetCapabilities">CSW Capabilities document</a> in de sectie over GetRecords requests. Daarnaast kunnen ook alle gebruikte Lucene veldnamen gebruikt worden, mocht je die kennen (bijv. "any" -- zelfde als "AnyText").</li>
+	</ul>
+	
+Een voorbeeld van een request naar de CSW-API op de TEST omgeving bij Site4U in de browser (met URLEncoding, daarom ziet er zo onleesbaar uit) is:<br/>
+
+<a href="http://delphinus.site4u.nl/CSWTransformer/CSWTransformer?ElementSetName=summary&maxRecords=1&url=http%3a%2f%2fnationaalgeoregister.nl%3a80%2fgeonetwork%2fsrv%2fen%2fcsw">http://delphinus.site4u.nl/CSWTransformer/CSWTransformer?url=http%3a%2f%2fnationaalgeoregister.nl%3a80%2fgeonetwork%2fsrv%2fen%2fcsw</a>.	
+
+</div>
+
+
+<h2>interface - response</h2>
+<div  style="margin:10px;">
+De response van en geslaagde request geeft het volledige CSW GetRecords response terug, geconverteerd van XML naar JSON zodat het gemakkelijk te gebruiken is in Javascript in de client pagina. De CSW GetRecords response is gespecificeerd in <a href="http://portal.opengeospatial.org/files/?artifact_id=20555">OpenGIS Catalogue Service Implementation Specification versie 2.0.2 (OGC 07-006)</a>.
+</div>
+
+<h2>contact</h2>
+<div  style="margin:10px;">
+Voor vragen, stuur me een mailtje, <a href="mailto:heikki.doeleman@geocat.net">heikki.doeleman@geocat.net</a>.
+</div>
+
+
+<div id="demo1" style="margin-top:30px;">
+	<div style="font-size:x-large;font-weight:bold;font-family:Lucida, sans-serif;">demo 1</div>
+	<span>Een request met ElementSetName=brief en maxRecords=1. </span>
+	<button onclick="demo(1, 'brief', 1);" style="display:block;margin:20px;">klik hier</button>
+	<button id="json1" onclick="json();" style="display:none;margin:20px;">toon volledig json resultaat</button>
+</div>
+<div id="json1result" style="display:none;margin:20px;padding:20px;border:solid 1px gray;color:gray" onclick="this.style.display='none';"/>
+</div>
+<div id="demo1result" style="display:none;">
+	<div>
+	<span id="">totaal aantal matchende resultaten: </span><span id="totalresults1"/>
+	</div>
+	<div>
+	<span id="">aantal teruggegeven resultaten: </span><span id="resultsReturned1"/>
+	</div>
+	<div>
+	<span id="">UUID: </span><span id="fileIdentifierValue1"/>
+	</div>	
+	<div>
+	<span id="">titel: </span><span id="titleValue1"/>
+	</div>		
+</div>
+
+<div id="demo2" style="margin-top:30px;">
+	<div style="font-size:x-large;font-weight:bold;font-family:Lucida, sans-serif;">demo 2</div>
+	<span>Een request met ElementSetName=summary en maxRecords=1. </span>
+	<button onclick="demo(2, 'summary', 1);" style="display:block;margin:20px;">klik hier</button>
+	<button id="json2" onclick="json();" style="display:none;margin:20px;">toon volledig json resultaat</button>
+</div>
+<div id="json2result" style="display:none;margin:20px;padding:20px;border:solid 1px gray;color:gray"  onclick="this.style.display='none';"/>
+</div>
+<div id="demo2result" style="display:none;">
+	<div>
+	<span id="">totaal aantal matchende resultaten: </span><span id="totalresults2"/>
+	</div>
+	<div>
+	<span id="">aantal teruggegeven resultaten: </span><span id="resultsReturned2"/>
+	</div>
+	<div>
+	<span id="">UUID: </span><span id="fileIdentifierValue2"/>
+	</div>	
+	<div>
+	<span id="">titel: </span><span id="titleValue2"/>
+	</div>	
+	<div>
+	<span id="">abstract: </span><span id="abstractValue2"/>
+	</div>	
+	<div>
+	<span id="">contact: </span><span id="pointofcontactindividualnameValue2"/>
+	</div>
+	<div>
+	<span id="">organisatie: </span><span id="pointofcontactorganisationnameValue2"/>
+	</div>
+	<div>
+	<span id="">positie: </span><span id="pointofcontactpositionnameValue2"/>
+	</div>	
+</div>
+
+<div id="demo3" style="margin-top:30px;">
+	<div style="font-size:x-large;font-weight:bold;font-family:Lucida, sans-serif;">demo 3</div>
+	<span>Een request met ElementSetName=brief en maxRecords=10. </span>
+	<button onclick="demo(3, 'brief', 10);" style="display:block;margin:20px;">klik hier</button>
+	<button id="json3" onclick="json();" style="display:none;margin:20px;">toon volledig json resultaat</button>
+</div>
+<div id="json3result" style="display:none;margin:20px;padding:20px;border:solid 1px gray;color:gray"  onclick="this.style.display='none';"/>
+</div>
+<div id="demo3result" style="display:none;">
+	<div>
+	<span id="">totaal aantal matchende resultaten: </span><span id="totalresults3"/>
+	</div>
+	<div>
+	<span id="">aantal teruggegeven resultaten: </span><span id="resultsReturned3"/>
+	</div>
+	<div>
+		<span id="currentresultlabel">getoonde resultaat: #</span><span id="currentresult">1</span>
+	</div>
+	<div>
+	<span id="">UUID: </span><span id="fileIdentifierValue3"/>
+	</div>	
+	<div>
+	<span id="">titel: </span><span id="titleValue3"/>
+	</div>		
+	<button id="" onclick="document.getElementById('demo3result').style.display='none';demoResultIndex(3, 'brief', 10, parseInt(document.getElementById('currentresult').textContent) + 1);" style="margin:20px;">toon volgende resultaat</button>
+
+</div>
+
+<div id="demo4" style="margin-top:30px;">
+	<div style="font-size:x-large;font-weight:bold;font-family:Lucida, sans-serif;">demo 4</div>
+	<span>Een request met ElementSetName=full en maxRecords=1. </span>
+	<button onclick="demo(4, 'full', 1);" style="display:block;margin:20px;">klik hier</button>
+	<button id="json4" onclick="json();" style="display:none;margin:20px;">toon volledig json resultaat</button>
+</div>
+<div id="json4result" style="display:none;margin:20px;padding:20px;border:solid 1px gray;color:gray"  onclick="this.style.display='none';"/>
+</div>
+<div id="demo4result" style="display:none;">
+	<div>
+	<span id="">totaal aantal matchende resultaten: </span><span id="totalresults4"/>
+	</div>
+	<div>
+	<span id="">aantal teruggegeven resultaten: </span><span id="resultsReturned4"/>
+	</div>
+	<div>
+	<span id="">UUID: </span><span id="fileIdentifierValue4"/>
+	</div>	
+	<div>
+	<span id="">titel: </span><span id="titleValue4"/>
+	</div>	
+	<div>
+	<span id="">abstract: </span><span id="abstractValue4"/>
+	</div>	
+	<div>
+	<span id="">contact: </span><span id="pointofcontactindividualnameValue4"/>
+	</div>
+	<div>
+	<span id="">organisatie: </span><span id="pointofcontactorganisationnameValue4"/>
+	</div>
+	<div>
+	<span id="">positie: </span><span id="pointofcontactpositionnameValue4"/>
+	</div>	
+</div>
+
+
+<div id="demo5" style="margin-top:30px;">
+	<div style="font-size:x-large;font-weight:bold;font-family:Lucida, sans-serif;">demo 5</div>
+	<span>Een request met ElementSetName=brief en maxRecords=10, en any=waddenzee. </span>
+	<button onclick="freetext(5, 'brief', 10, 1, 'any', 'waddenzee');" style="display:block;margin:20px;">klik hier</button>
+	<button id="json5" onclick="json();" style="display:none;margin:20px;">toon volledig json resultaat</button>
+</div>
+<div id="json5result" style="display:none;margin:20px;padding:20px;border:solid 1px gray;color:gray" onclick="this.style.display='none';"/>
+</div>
+<div id="demo5result" style="display:none;">
+	<div>
+	<span id="">totaal aantal matchende resultaten: </span><span id="totalresults5"/>
+	</div>
+	<div>
+	<span id="">aantal teruggegeven resultaten: </span><span id="resultsReturned5"/>
+	</div>
+	<div>
+	<span id="">UUID: </span><span id="fileIdentifierValue5"/>
+	</div>	
+	<div>
+	<span id="">titel: </span><span id="titleValue5"/>
+	</div>		
+</div>
+
+</body>
+</html>

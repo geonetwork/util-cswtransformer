@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="CSWTransformer" default="war" basedir=".">
+	<property name="projectName" value="CSWTransformer"/>
+	<property name="src.dir" value="./src"/>
+	<property name="install.dir" value="./install"/>
+	<property name="class.dir" value="./build/classes"/>
+	<property name="lib.dir" value="./lib"/>
+    <property name="xslt.dir" value="./xslt"/>
+    <path id="build.class.path">
+        <fileset dir="lib">
+            <include name="**/*.jar" />
+        </fileset>
+    </path>
+
+
+	<target name ="war" description="Create a war for the project" depends="compile">
+		<war destfile="${install.dir}/CSWTransformer.war" webxml="${src.dir}/web.xml">
+          <fileset dir="${xslt.dir}"/>
+
+		  <lib dir="${lib.dir}">
+            <exclude name="servlet-api.jar"/>
+          </lib>
+  		  <classes dir="${class.dir}"/>
+		</war>
+		<copy file="readme.txt" todir="${install.dir}"/>
+	</target>
+
+    <target name="compile" description="Compile Java files">
+        <echo>=== COMPILE ===</echo>
+        <echo>Compiling ${src.dir} files ...</echo>
+        <javac debug="on" srcdir="${src.dir}" destdir="${class.dir}" includes="**/*">
+            <classpath refid="build.class.path" />
+        </javac>
+        <copy todir="${xslt.dir}">
+            <fileset dir="${src.dir}" includes="**/*.properties **/*.xsl **/*.xslt"/> 
+        </copy>
+    </target>
+
+
+
+
+</project>
